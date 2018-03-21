@@ -111,6 +111,8 @@ if __name__ == '__main__':
                 if github_last_commit == "empty" or github_last_commit == coding_last_commit:
                     print(name+" don't need synchronization")
                     continue
+                else:
+                    synchronization(name, description)
             else:
                 synchronization(name, description)
     except Exception as e:
