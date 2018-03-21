@@ -43,6 +43,7 @@ def coding_creat_project(project_name,description):
 def github_get_repos():
     url = "https://api.github.com/users/{}/repos".format(github_name)
     response = json.loads(requests.get(url).text)
+    print(response)
     return response
 
 def check_repo_exist(repo_name):
@@ -60,34 +61,48 @@ def del_file(path):
         else:
             del_file(path_file)
 
+def coding_get_last_commit(repo_name):
+    url = "https://coding.net/api/user/{}/project/{}/git".format(coding_name,repo_name)
+    response = json.loads(requests.get(url).text)['data']['depot'].get('lastCommitSha',"empty")
+    return response
+
+def github_get_last_commit(repo_name):
+    url = "https://api.github.com/repos/{}/{}/commits".format(github_name,repo_name)
+    response = json.loads(requests.get(url).text)[0]['sha']
+    return response
+
+def copy(name,description):
+    cd_command = "cd " + name + " & "
+    clone_command = "git clone " + clone_url
+    subprocess.Popen(clone_command, shell=True, stdout=subprocess.PIPE).wait()   # clone代码
+
+    subprocess.Popen(cd_command + "git remote rm origin", shell=True, stdout=subprocess.PIPE).wait(timeout=10)
+
+    # 修改远程仓库地址
+    add_origin_command = cd_command + "git remote add origin https://git.coding.net/{}/{}.git".format(
+        coding_name, name)
+    subprocess.Popen(add_origin_command, shell=True, stdout=subprocess.PIPE).wait(timeout=10)
+
+    res = check_repo_exist(name)
+    if res:  # 如果存在直接推
+        subprocess.Popen(cd_command + "git push origin master", shell=True, stdout=subprocess.PIPE).wait(
+            timeout=10)
+    else:
+        coding_creat_project(name, description)
+        subprocess.Popen(cd_command + "git push origin master", shell=True, stdout=subprocess.PIPE).wait(
+            timeout=10)
+
 if __name__ == '__main__':
     github_repos = github_get_repos()
     try:
         for repo in github_repos:
             name = repo['name']
+            print(name)
             description = repo['description']
             clone_url = repo['clone_url']
-
-            cd_command = "cd " + name + " & "
-            print(name)
-
-            clone_command = "git clone " + clone_url
-            subprocess.Popen(clone_command, shell=True, stdout=subprocess.PIPE).wait(timeout=200)  # clone代码
-
-            subprocess.Popen(cd_command + "git remote rm origin", shell=True, stdout=subprocess.PIPE).wait(timeout=10)
-
-            # 修改远程仓库地址
-            add_origin_command = cd_command + "git remote add origin https://git.coding.net/{}/{}.git".format(
-                coding_name, name)
-            subprocess.Popen(add_origin_command, shell=True, stdout=subprocess.PIPE).wait(timeout=10)
-
-            res = check_repo_exist(name)
-            if res:  # 如果存在直接推
-                subprocess.Popen(cd_command + "git push origin master", shell=True, stdout=subprocess.PIPE).wait(
-                    timeout=10)
+            if(check_repo_exist(name) and github_get_last_commit(name) == coding_get_last_commit(name)):
+                continue
             else:
-                coding_creat_project(name, description)
-                subprocess.Popen(cd_command + "git push origin master", shell=True, stdout=subprocess.PIPE).wait(
-                    timeout=10)
+                copy(name, description)
     except Exception as e:
         print(e)
